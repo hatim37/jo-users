@@ -4,8 +4,14 @@ import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
+
+import com.ecom.users.clients.ValidationRestClient;
+import com.ecom.users.dto.UserActivationDto;
+import com.ecom.users.dto.UserDto;
+import com.ecom.users.dto.ValidationDto;
 import com.ecom.users.entity.Role;
 import com.ecom.users.entity.User;
+import com.ecom.users.model.Validation;
 import com.ecom.users.repository.RoleRepository;
 import com.ecom.users.repository.UserRepository;
 import com.ecom.users.response.UserNotFoundException;
@@ -16,6 +22,7 @@ import org.springframework.stereotype.Service;
 
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class UserService {
@@ -23,11 +30,15 @@ public class UserService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final TokenTechnicService tokenTechnicService;
+    private final ValidationRestClient validationRestClient;
 
-    public UserService(UserRepository userRepository, RoleRepository roleRepository, PasswordEncoder passwordEncoder) {
+    public UserService(UserRepository userRepository, RoleRepository roleRepository, PasswordEncoder passwordEncoder, TokenTechnicService tokenTechnicService, ValidationRestClient validationRestClient) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
+        this.tokenTechnicService = tokenTechnicService;
+        this.validationRestClient = validationRestClient;
     }
 
     public ResponseEntity<?> registration(User user) throws NoSuchAlgorithmException {
@@ -58,7 +69,13 @@ public class UserService {
         //on sauvegarde
         user = this.userRepository.save(user);
 
-        return ResponseEntity.status(HttpStatus.CREATED).body("Utilisateur créé avec succès !");
+        //on fait une demande de validation par mail
+        Validation validationId = this.validationRestClient.sendValidation("Bearer "+this.tokenTechnicService.getTechnicalToken(),new ValidationDto(user.getId(),user.getUsername(), null, user.getEmail(), "registration"));
+        if(validationId.getId()==null){
+            throw new UserNotFoundException("Service indisponible");
+        }
+
+        return new ResponseEntity<>(Map.of("message", "validation", "id", validationId.getId().toString()), HttpStatus.CREATED);
     }
 
     public String generateAndEncryptKeyForDB() throws NoSuchAlgorithmException {
@@ -78,5 +95,28 @@ public class UserService {
         userRepository.save(user);
     }
 
+    public void activationUser(UserActivationDto userActivationDto) {
+        Optional<User> optionalUser = this.userRepository.findById(userActivationDto.getUserId());
+        if (optionalUser.isPresent()) {
+            User user = optionalUser.get();
+            user.setActive(true);
+            userRepository.save(user);
+        }
+    }
+
+    public User findById(Long id){
+        return userRepository.findById(id).orElse(null);
+    }
+
+    public User findByEmail(String email){
+        return userRepository.findByEmail(email).orElse(null);
+    }
+
+    public List<UserDto> findAll(){
+        return userRepository.findAll()
+                .stream()
+                .map(UserDto::new)
+                .collect(Collectors.toList());
+    }
 
 }
