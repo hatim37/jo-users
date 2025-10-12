@@ -1,6 +1,8 @@
 package com.ecom.users.controller;
 
 
+import com.ecom.users.dto.EditPasswordDto;
+import com.ecom.users.dto.UserDto;
 import com.ecom.users.entity.User;
 import com.ecom.users.service.UserService;
 import lombok.AllArgsConstructor;
@@ -19,6 +21,26 @@ UserController {
     @PostMapping(path = "/registration")
     public ResponseEntity<?> inscription(@RequestBody User user) throws NoSuchAlgorithmException {
         return ResponseEntity.ok().body(this.userService.registration(user));
+    }
+
+    @DeleteMapping(path = "/delete-user/{email}")
+    public ResponseEntity<?> removeUser(@PathVariable String email) {
+        return ResponseEntity.ok().body(this.userService.removeUser(email));
+    }
+
+    @GetMapping("/users-email/{email}")
+    public UserDto customerByEmail(@PathVariable String email){
+        return userService.userByEmail(email);
+    }
+
+    @PostMapping(path = "/edit-password")
+    public ResponseEntity<?> editPassword(@RequestBody EditPasswordDto editPasswordDto) {
+        return ResponseEntity.ok().body(this.userService.editPassword(editPasswordDto));
+    }
+
+    @PutMapping("/users-edit")
+    public ResponseEntity<?> updateProduct(@RequestBody UserDto userDto) {
+        return ResponseEntity.ok().body(this.userService.updateUser(userDto));
     }
 
 }

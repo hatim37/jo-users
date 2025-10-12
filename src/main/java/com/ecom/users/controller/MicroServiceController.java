@@ -1,11 +1,13 @@
 package com.ecom.users.controller;
 
 
+import com.ecom.users.dto.NewPasswordDto;
 import com.ecom.users.dto.UserActivationDto;
 import com.ecom.users.dto.UserDto;
 import com.ecom.users.dto.UserLoginDto;
 import com.ecom.users.entity.User;
 import com.ecom.users.service.UserService;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -38,6 +40,11 @@ public class MicroServiceController {
     @GetMapping(path = "/_internal/allUsers")
     public List<UserDto> getUsers() {
         return userService.findAll();
+    }
+
+    @PostMapping(path = "/_internal/new-password")
+    public ResponseEntity<?> newPassword(@RequestBody NewPasswordDto newPasswordDto) {
+        return ResponseEntity.ok().body(this.userService.newPassword(newPasswordDto));
     }
 
 }

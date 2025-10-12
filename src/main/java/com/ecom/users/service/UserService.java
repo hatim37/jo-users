@@ -5,12 +5,12 @@ import javax.crypto.SecretKey;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
 
+import com.ecom.users.clients.OrdersRestClient;
 import com.ecom.users.clients.ValidationRestClient;
-import com.ecom.users.dto.UserActivationDto;
-import com.ecom.users.dto.UserDto;
-import com.ecom.users.dto.ValidationDto;
+import com.ecom.users.dto.*;
 import com.ecom.users.entity.Role;
 import com.ecom.users.entity.User;
+import com.ecom.users.model.Order;
 import com.ecom.users.model.Validation;
 import com.ecom.users.repository.RoleRepository;
 import com.ecom.users.repository.UserRepository;
@@ -31,13 +31,15 @@ public class UserService {
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final TokenTechnicService tokenTechnicService;
+    private final OrdersRestClient ordersRestClient;
     private final ValidationRestClient validationRestClient;
 
-    public UserService(UserRepository userRepository, RoleRepository roleRepository, PasswordEncoder passwordEncoder, TokenTechnicService tokenTechnicService, ValidationRestClient validationRestClient) {
+    public UserService(UserRepository userRepository, RoleRepository roleRepository, PasswordEncoder passwordEncoder, TokenTechnicService tokenTechnicService, OrdersRestClient ordersRestClient, ValidationRestClient validationRestClient) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
         this.tokenTechnicService = tokenTechnicService;
+        this.ordersRestClient = ordersRestClient;
         this.validationRestClient = validationRestClient;
     }
 
@@ -74,6 +76,12 @@ public class UserService {
         if(validationId.getId()==null){
             throw new UserNotFoundException("Service indisponible");
         }
+
+        //on initialise une commande
+        Order order = new Order();
+        order.setUserId((long) user.getId());
+        this.ordersRestClient.createOrder("Bearer "+this.tokenTechnicService.getTechnicalToken(),order);
+
 
         return new ResponseEntity<>(Map.of("message", "validation", "id", validationId.getId().toString()), HttpStatus.CREATED);
     }
@@ -117,6 +125,48 @@ public class UserService {
                 .stream()
                 .map(UserDto::new)
                 .collect(Collectors.toList());
+    }
+
+    public ResponseEntity<?> removeUser (String email){
+        User user = this.userRepository.findByEmail(email).orElseThrow(() -> new UserNotFoundException("utilisateur introuvable"));
+        try {
+            user.getRoles().clear();
+            this.userRepository.delete(user);
+            return ResponseEntity.ok("Le compte est supprimé");
+        } catch (Exception e) {
+            throw new UserNotFoundException("Impossible de supprimer le compte");
+        }
+    }
+
+    public ResponseEntity<?> editPassword(EditPasswordDto editPasswordDto) {
+        User user = userRepository.findByEmail(editPasswordDto.getEmail()).orElseThrow(()-> new UserNotFoundException("Utilisateur introuvable"));
+        Validation validationId = this.validationRestClient.sendValidation("Bearer "+this.tokenTechnicService.getTechnicalToken(),new ValidationDto(user.getId(),user.getUsername(), null, user.getEmail(), "editPassword"));
+        if(validationId.getId()==null){
+            throw new UserNotFoundException("Service indisponible");
+        }
+        return new ResponseEntity<>(Map.of("message", "validation", "id", validationId.getId().toString()), HttpStatus.CREATED);
+    }
+
+    public ResponseEntity<?> newPassword(NewPasswordDto newPasswordDto) {
+
+        User user = userRepository.findById(newPasswordDto.getUserId()).orElseThrow(()-> new UserNotFoundException("Utilisateur introuvable"));
+        String passwordCrypte = this.passwordEncoder.encode(newPasswordDto.getPassword());
+        user.setPassword(passwordCrypte);
+        this.userRepository.save(user);
+        return ResponseEntity.ok("Votre mot de passe a été modifié avec succès !");
+    }
+
+    public ResponseEntity<?> updateUser(UserDto userDto) {
+        User user = userRepository.findById(userDto.getId()).orElseThrow(()-> new UserNotFoundException("Utilisateur introuvable"));
+        user.setName(userDto.getName());
+        user.setUsername(userDto.getUsername());
+        this.userRepository.save(user);
+        return ResponseEntity.ok("Votre compte a été modifié avec succès !");
+    }
+
+    public UserDto userByEmail(String email){
+        User user =  userRepository.findByEmail(email).get();
+        return new UserDto(user);
     }
 
 }

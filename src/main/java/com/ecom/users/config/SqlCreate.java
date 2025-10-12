@@ -75,7 +75,7 @@ public class SqlCreate {
                             .name("studi")
                             .username("admin")
                             .email("admin@admin.com")
-                            .password(passwordEncoder.encode("1234"))
+                            .password(passwordEncoder.encode("Studi1234"))
                             .active(true)
                             .secretKey(this.userService.generateAndEncryptKeyForDB())
                             .build();
